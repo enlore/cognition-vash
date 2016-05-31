@@ -280,7 +280,7 @@
 
                             if (tok.type === "prop") {
                                 if (tok.optional) {
-                                    cur = cur[tok.name] || undefined;
+                                    cur = cur[tok.name] || "";
                                 } else {
                                     if (!cur.hasOwnProperty(tok.name)) {
                                         throw new Error("Trying to grab nonexistant prop " + tok.name + " from val of " + toks[i - 1].name);
