@@ -162,7 +162,7 @@
         var blueSel = childNodesByName(frag.querySelector('blueprint'));
         var scriptSel = frag.querySelector('script');
         var htmlSel = unwrapDisplay(frag.querySelector('display'));
-        var bindSel = htmlSel.querySelectorAll("[bind]");
+        var bindSel = htmlSel ? htmlSel.querySelectorAll("[bind]") : [];
         var templSel = {};
         var templId = 0;
 
