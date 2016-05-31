@@ -325,7 +325,13 @@
                                 cur = ctx.scriptData[tok.name](cur);
 
                             } else if (tok.type === "attr") {
-                                cur = ctx.scriptData[tok.name].raw().getAttribute(tok.name);
+                                var _node = ctx.scriptData[camelId].raw();
+
+                                if (tok.name === "value") {
+                                    cur = _node.value;
+                                } else {
+                                    cur = ctx.scriptData[camelId].raw().getAttribute(tok.name);
+                                }
                             }
                         }
 
