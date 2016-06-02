@@ -272,8 +272,6 @@
                         var filterStop = false;
                         var cur = arg;
 
-                        console.log(toks);
-
                         // skip the first and last
                         for (var i = 1; i < toks.length - 1; i++) {
                             var tok = toks[i];
@@ -322,6 +320,7 @@
                                 if (!ctx.scriptData[tok.name]) {
                                     throw new Error("Cog has no transform or filter method (" + tok.name + ") in scope");
                                 }
+
                                 cur = ctx.scriptData[tok.name](cur);
 
                             } else if (tok.type === "attr") {
@@ -351,9 +350,16 @@
                     } else if ( last.type === "attr") {
                         var exitMethodName = "_templateMethod_exit_" + id + "_" + i;
 
-                        ctx.scriptData[exitMethodName] = (function templateBoundExit (val) {
-                            ctx.scriptData[camelId].raw()[last.name] = val;
-                        }).bind(ctx);
+                        ctx.scriptData[exitMethodName] = (function templateBoundExit (lastTok, val) {
+                            var _node = ctx.scriptData[camelId].raw()
+
+                            if (lastTok.name === "value") {
+                                _node.value = val;
+                            } else {
+                                _node[lastTok.name] = val;
+                            }
+
+                        }).bind(ctx, last);
 
                         def.run = exitMethodName;
 
