@@ -1,5 +1,5 @@
 /* jshint node: false, esversion: 6 */
-// version 1.5.0
+// version 1.6.0 -- templates only on prototype
 
 ;(function VASH(context) {
     "use strict";
@@ -9,7 +9,7 @@
     var Vash = {};
 
     var plugins = typeof seele !== 'undefined' && seele;
-    if(plugins)
+    if (plugins)
         plugins.register('vash', Vash, true);
     else
         context.Vash = Vash; // bind to outer context
@@ -66,22 +66,22 @@
     var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
 
 
-    Vash.hasFile = function(url){
+    Vash.hasFile = function (url) {
         return blueprintMap.hasOwnProperty(url);
     };
 
-    Vash.blueprint = function(url){
+    Vash.blueprint = function (url) {
         return blueprintMap[url];
     };
 
-    Vash.script = function(url){
+    Vash.script = function (url) {
 
         var script = scriptMap[url] || defaultScriptDataPrototype;
         return Object.create(script);
 
     };
 
-    Vash.display = function(url){
+    Vash.display = function (url) {
         return displayMap[url];
     };
 
@@ -97,9 +97,9 @@
 
         tmp = fragment.appendChild(document.createElement("div"));
 
-        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
+        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>");
 
-        for(i = 0; i < tmp.childNodes.length; i++) {
+        for (i = 0; i < tmp.childNodes.length; i++) {
             nodes.push(tmp.childNodes[i]);
         }
 
@@ -115,17 +115,17 @@
         return fragment;
     }
 
-    function childNodesByName(node){
+    function childNodesByName(node) {
 
         var result = {};
-        if(!node)
+        if (!node)
             return result;
 
         var children = node.childNodes;
         var i = 0;
         var n;
 
-        while((n = children[i++])){
+        while ((n = children[i++])) {
             var tag = n.localName;
             var arr = result[tag] = result[tag] || [];
             arr.push(n);
@@ -134,27 +134,41 @@
         return result;
     }
 
-    function unwrapDisplay(display){ //
+    function unwrapDisplay(display) { //
 
-        if(!display) return null;
+        if (!display) return null;
         var fragment = document.createDocumentFragment();
         var children = display.children;
-        while(children.length){
+        while (children.length) {
             fragment.appendChild(children[0]);
         }
         return fragment;
     }
 
 
-    Vash.parseFile = function(url, text){
+    function giveIdsToBoundNodes(bindSel) {
 
-        function endsWith(entireStr, ending){
+        var given = 0;
+        for (var i = 0; i < bindSel.length; i++) {
+            var node = bindSel[i];
+            if (!node.hasAttribute('id')) {
+                node.setAttribute('id', '_bound_node_' + i);
+                given++;
+            }
+        }
+        return given;
+
+    }
+
+    Vash.parseFile = function (url, text) {
+
+        function endsWith(entireStr, ending) {
             return (entireStr.lastIndexOf(ending) === (entireStr.length - ending.length) && entireStr.length > ending.length);
         }
 
         var isHTML = endsWith(url, ".html");
 
-        if(!isHTML)
+        if (!isHTML)
             return;
 
         var frag = buildFragment(text);
@@ -163,225 +177,211 @@
         var scriptSel = frag.querySelector('script');
         var htmlSel = unwrapDisplay(frag.querySelector('display'));
         var bindSel = htmlSel ? htmlSel.querySelectorAll("[bind]") : [];
+
+        var given = giveIdsToBoundNodes(bindSel);
+
         var templSel = {};
         var templId = 0;
 
-        var scriptText= scriptSel && scriptSel.innerHTML;
+        var scriptText = scriptSel && scriptSel.innerHTML;
 
-        if(scriptText) {
+        if (scriptText) {
             scriptText = wrapScript(scriptText, url);
             try {
                 addScriptElement(scriptText);
-            } catch(err) {
+            } catch (err) {
                 console.log(err);
             }
         } else {
             activeScriptData = activeScriptData || Object.create(defaultScriptDataPrototype);
         }
 
-        if(!activeScriptData)
+        if (!activeScriptData)
             throw new Error("Script Data Failure:" + url);
 
-        Array.prototype.map.call(bindSel, getBind).forEach(doParse);
 
-        function camelCase(str){
-            return str.replace( /-([a-z])/ig, function( all, letter ) {
-                return letter.toUpperCase();
-            } );
-        }
+        var templateSensors = [];
 
-        function doParse (chunk, _i) {
-            // use given id or gen one
-            var id = chunk.node.id = chunk.node.id || "autogen--bound-" + templId++;
 
-            var plans = templSel[id] = parseTemplate(chunk.bind);
-
-            var methodName = "_templateBinding_" + id;
-
-            activeScriptData[methodName] = boundTemplateExecutorThing.bind(this, plans, id);
-
-            function boundTemplateExecutorThing (plans, id, ctx) {
-                //var this = ctx;
-
-                var camelId = camelCase(id);
-
-                for (var i = 0; i < plans.length; i++) {
-                    // find
-                    // autorun
-                    // watch
-                    // need
-                    // topic
-                    // pipe
-                    // tarnsformPresent
-                    // transformType
-                    // transform
-                    // toggle
-
-                    var def = {
-                        autorun: true,
-                        topic: "update",
-                        watch: []
-                    };
-
-                    var tokens = plans[i];
-
-                    var first = tokens[0];
-                    var last = tokens[ tokens.length - 1 ];
-
-                    // everything is a need for a multi sensor
-                    if (Array.isArray(first)) {
-                        var needs = [];
-
-                        // no topic for you if you are doing a multi
-                        first.forEach(function doDataChunk (tok) {
-                            needs.push(tok.name);
-                        });
-
-                        def.watch = def.need = needs;
-                        def.group = true;
-                        def.batch = true;
-                        def.retain = true;
-
-                    } else if (first.type && first.type === "data") {
-                        if (first.need) {
-                            def.need = first.name;
-                            def.watch = first.name;
-                        } else {
-                            def.watch = first.name;
-                            def.optional = first.optional || false;
-                        }
-
-                        if (first.topic) def.on = first.topic;
-
-                    } else if (first.type && first.type === "event") {
-                        def.find = camelId;
-                        def.topic = first.name;
-                    } else {
-                        var err = new Error("Malformed first token in plan.");
-                        err._token = first;
-                        throw err;
-                    }
-
-                    var methodName = "_templateMethod_" + id + "_" + i;
-
-                    // this needs to become a recursive chomper, i think
-                    ctx.scriptData[methodName] = (function templateBoundIntermediate (toks, arg) {
-                        // no middle steps
-                        if (toks.length === 2) return arg;
-
-                        var filterStop = false;
-                        var cur = arg;
-
-                        // skip the first and last
-                        for (var i = 1; i < toks.length - 1; i++) {
-                            var tok = toks[i];
-
-                            if (tok.type === "prop") {
-                                if (tok.optional) {
-                                    cur = cur[tok.name] || "";
-                                } else {
-                                    if (!cur.hasOwnProperty(tok.name)) {
-                                        throw new Error("Trying to grab nonexistant prop " + tok.name + " from val of " + toks[i - 1].name);
-                                    } else {
-                                        cur = cur[tok.name];
-                                    }
-                                }
-
-                            } else if (Array.isArray(tok)) {
-                                /**
-                                 * So what you get here is reflective of the
-                                 * way watching multiple data locs works:
-                                 *
-                                 * - for one data loc watched, you just get the
-                                 *   value back from the read()
-                                 * - for more than one watched, you get each
-                                 *   val back in an object keyed by the loc
-                                 *   name
-                                 */
-                                var vals = {};
-
-                                for (var i = 0; i < tok.length; i++) {
-                                    // NOTE setting a default here, careful
-                                    // mang
-                                    vals[tok[i].name] = ctx.findData(tok[i].name).read(tok[i].topic || "update");
-                                }
-
-                                cur = vals;
-
-                            } else if (tok.type === "data") {
-                                cur = ctx.findData(tok.name).read(tok.topic);
-
-                            } else if (tok.type === "method") {
-                                if (tok.filter && !ctx.scriptData[tok.name](cur)) {
-                                    filterStop = true;
-                                    //break;
-                                }
-
-                                if (!ctx.scriptData[tok.name]) {
-                                    throw new Error("Cog has no transform or filter method (" + tok.name + ") in scope");
-                                }
-
-                                cur = ctx.scriptData[tok.name](cur);
-
-                            } else if (tok.type === "attr") {
-                                var _node = ctx.scriptData[camelId].raw();
-
-                                if (tok.name === "value") {
-                                    cur = _node.value;
-                                } else {
-                                    cur = ctx.scriptData[camelId].raw().getAttribute(tok.name);
-                                }
-                            }
-                        }
-
-                        if (!filterStop) return cur;
-
-                    }).bind(ctx, tokens);
-
-                    // emit, emitPresent, emitType
-
-                    def.transform = methodName;
-                    def.transformPresent = true;
-                    def.transformType = PROP;
-
-                    if (last.type === "data") {
-                        def.pipe = last.name;
-
-                    } else if ( last.type === "attr") {
-                        var exitMethodName = "_templateMethod_exit_" + id + "_" + i;
-
-                        ctx.scriptData[exitMethodName] = (function templateBoundExit (lastTok, val) {
-                            var _node = ctx.scriptData[camelId].raw()
-
-                            if (lastTok.name === "value") {
-                                _node.value = val;
-                            } else {
-                                _node[lastTok.name] = val;
-                            }
-
-                        }).bind(ctx, last);
-
-                        def.run = exitMethodName;
-
-                    } else if (last.type === "method") {
-                        def.run = last.name;
-                    }
-
-                    ctx._declarationDefs.sensors.push(def);
-                }
+        for (var i = 0; i < bindSel.length; i++) {
+            var node = bindSel[i];
+            var id = node.getAttribute('id');
+            var plans = parseTemplate(node.getAttribute('bind'));
+            for (var j = 0; j < plans.length; j++) {
+                var plan = plans[j];
+                var def = createSensorDefFromPlan(id, plan, j); // using activeScriptData as the target for new transform methods
+                templateSensors.push(def);
             }
         }
 
-        function getBind (node) {
-            return {
-                node: node,
-                bind: node.getAttribute("bind")
+        function createTemplateRenderMethod(id, attrName){
+
+            var f = function templateTransformMethod(msg, topic, tag) {
+                return doTemplateRenderMethod.call(this, id, attrName, msg);
             };
+
+            return f;
+
         }
 
+
+        function createTemplateTransformMethod(id, plan) {
+
+            var f = function templateTransformMethod(msg, topic, tag) {
+                return doTemplateTransformMethod.call(this, id, plan, msg);
+            };
+
+            return f;
+        }
+
+
+        function doTemplateRenderMethod(id, attrName, msg){
+
+            var node = this[id].raw();
+            if (attrName === "value") {
+                node.value = msg;
+            } else {
+                node[attrName] = msg;
+            }
+
+        }
+
+        function doTemplateTransformMethod(id, plan, msg){
+
+            if (plan.length <= 2) return msg;
+
+            var cur = msg;
+            var mi = this.mapItem;
+
+            // skip the first and last
+            for (var i = 1; i < plan.length - 1; i++) {
+                var tok = plan[i];
+
+                if (tok.type === "prop") {
+
+                    if (tok.optional) {
+                        cur = cur[tok.name] || "";
+                    } else {
+                        if (!cur.hasOwnProperty(tok.name)) {
+                            throw new Error("Trying to grab missing prop " + tok.name + " from val of " + plan[i - 1].name);
+                        } else {
+                            cur = cur[tok.name];
+                        }
+                    }
+
+                } else if (Array.isArray(tok)) {
+
+                    var vals = {};
+                    for (var j = 0; j < tok.length; j++) {
+                        vals[tok[j].name] = mi.findData(tok[j].name).read(tok[j].topic || "update");
+                    }
+
+                    cur = vals;
+
+                } else if (tok.type === "data") {
+                    cur = mi.findData(tok.name).read(tok.topic);
+
+                } else if (tok.type === "method") {
+
+                    if (!mi.scriptData[tok.name]) {
+                        throw new Error("Cog has no transform or filter method (" + tok.name + ") in scope");
+                    }
+
+                    cur = mi.scriptData[tok.name](cur);
+
+                } else if (tok.type === "attr") {
+                    var _node = mi.scriptData[id].raw();
+
+                    if (tok.name === "value") {
+                        cur = _node.value;
+                    } else {
+                        cur = mi.scriptData[id].raw().getAttribute(tok.name);
+                    }
+                }
+            }
+
+            return cur;
+
+        }
+
+
+        function createSensorDefFromPlan(id, plan, planNum) {
+
+
+            var def = {
+                autorun: true,
+                topic: "update",
+                watch: []
+            };
+
+
+            var tokens = plan;
+
+            var first = tokens[0];
+            var last = tokens[tokens.length - 1];
+
+            // everything is a need for a multi sensor
+            if (Array.isArray(first)) {
+                var needs = [];
+
+                // no topic for you if you are doing a multi
+                first.forEach(function doDataChunk(tok) {
+                    needs.push(tok.name);
+                });
+
+                def.watch = def.need = needs;
+                def.group = true;
+                def.batch = true;
+                def.retain = true;
+
+            } else if (first.type && first.type === "data") {
+                if (first.need) {
+                    def.need = first.name;
+                    def.watch = first.name;
+                } else {
+                    def.watch = first.name;
+                    def.optional = first.optional || false;
+                }
+
+                if (first.topic) def.on = first.topic;
+
+            } else if (first.type && first.type === "event") {
+                def.find = id;
+                def.topic = first.name;
+            } else {
+                var err = new Error("Malformed first token in plan.");
+                err._token = first;
+                throw err;
+            }
+
+            // emit, emitPresent, emitType
+
+            var transformMethodName = '_transform_' + id + '_' + planNum;
+            activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan);
+            def.transform = transformMethodName;
+            def.transformPresent = true;
+            def.transformType = PROP;
+
+            if (last.type === "data") {
+                def.pipe = last.name;
+
+            } else if (last.type === "attr") {
+
+                var renderMethodName = '_render_' + id + '_' + planNum;
+                activeScriptData[renderMethodName] = createTemplateRenderMethod(id, last.name);
+                def.run = renderMethodName;
+
+            } else if (last.type === "method") {
+                def.run = last.name;
+            }
+
+            console.log(id, plan, def);
+            return def;
+
+        }
+
+
         templateMap[url] = templSel;
-
-
         scriptMap[url] = activeScriptData;
         activeScriptData = null;
 
@@ -389,6 +389,9 @@
             displayMap[url] = htmlSel;
 
         var blueprint = extractDeclarations(blueSel);
+
+        blueprint.sensors = blueprint.sensors.concat(templateSensors);
+
         blueprintMap[url] = blueprint;
 
     };
