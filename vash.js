@@ -1065,15 +1065,41 @@
             // ?    optional object prop or data loc
             // !    needed data loc
             // .    chain/deref operator
-            // :    topic operator
+            // :    topic separator
+            // >
+            // <
+            // >=
+            // <=
+            // ===
+            // !==
+            // ~false
+            // ~true
 
-        const first = link.charAt(0);
-        const syms = ["@", "#", "*"];
+        const syms = ["@", "#", "*", ">", "<", ">=", "<=", "===", "!==", "~false", "~true"];
 
-        if (syms.indexOf(first) !== -1)
-            return [first, link.slice(1)];
+        //var re = buildRegex(syms);
+        var re = /^(@|#|\*|>=|<=|>|<|===|!==|~false|~true)/
 
-        else {
+        var res;
+
+        if ((res = re.exec(link))) {
+            var sym = res[0];
+            var len = sym.length;
+            var val = link.slice(len).trim();
+
+            // if we don't see single quotes wrapping a the val, assume
+            // a number
+            // (trying not to actually look at the val)
+            if (/(>=|<=|>|<|===|!==)/.test(sym) && !/'.*'/.test(val)) {
+                val = parseFloat(val);
+
+            } else if (/'.*'/.test(val)) {
+                val = val.replace(/'/g, "");
+            }
+
+            return [sym, val];
+
+        } else {
            let bits = link.split(".");
            return bits;
         }
@@ -1093,6 +1119,17 @@
             "*": "method"
         };
 
+        const compMap = {
+            "<": "lt-filter",
+            ">": "gt-filter",
+            "<=": "lte-filter",
+            ">=": "gte-filter",
+            "===": "eq-filter",
+            "!==": "neq-filter",
+            "~true": "truthy-filter",
+            "~false": "falsey-filter",
+        };
+
         if (bits[0] in typeMap) {
             let plan = {
                 type: typeMap[bits[0]]
@@ -1101,8 +1138,18 @@
             if (/\?$/.test(bits[1]) && plan.type === "method") {
                 plan.filter = true;
                 plan.name = bits[1].slice(0, -1);
+
             } else {
                 plan.name = bits[1];
+            }
+
+            return plan;
+
+        } else if (bits[0] in compMap) {
+            let plan = {
+                type: compMap[bits[0]],
+                filter: true,
+                value: bits[1] || null
             }
 
             return plan;
