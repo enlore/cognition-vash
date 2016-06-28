@@ -306,6 +306,62 @@
 
         function createTransforms (id, plan, planNum, def) {
 
+            var filterFunMap = {
+                "lt-filter": function (val) {
+                    return function (msg) {
+                        return msg < val;
+                    }
+                },
+
+                "gt-filter": function (val) {
+                    return function (msg) {
+                        return msg > val;
+                    }
+                },
+
+                "lte-filter": function (val) {
+                    return function (msg) {
+                        return msg <= val;
+                    }
+                },
+
+                "gte-filter": function (val) {
+                    return function (msg) {
+                        return msg >= val;
+                    }
+                },
+
+                "eq-filter": function (val) {
+                    return function (msg) {
+                        return msg === val;
+                    }
+                },
+
+                "neq-filter": function (val) {
+                    return function (msg) {
+                        return msg !== val;
+                    }
+                },
+
+                // 0 > false
+                // "" > false
+                // "cat" > true
+                "truthy-filter": function () {
+                    return function (msg) {
+                        return !!msg;
+                    }
+                },
+
+                // 0 > true
+                // "" > true
+                // "cat" > false
+                "falsey-filter": function () {
+                    return function (msg) {
+                        return !!!msg;
+                    }
+                }
+            };
+
             var hasFilter = false;
             var filterPosition = null;
 
@@ -328,10 +384,20 @@
                 def.adaptPresent = true;
                 def.adaptType = PROP;
 
-                def.filter = plan[filterPosition].name;
+                if (plan[filterPosition].type === "method") {
+                    def.filter = plan[filterPosition].name;
+
+                } else {
+                    var filter = plan[filterPosition];
+                    var filterMethodName =  "_" + filter.type + "_" + (filter.value || "") + "_" + id + "_" + planNum;
+
+                    activeScriptData[filterMethodName] = filterFunMap[filter.type](filter.value/*, msg comes in here */);
+
+                    def.filter = filterMethodName;
+                }
 
                 var transformMethodName = '_transform_' + id + '_' + planNum;
-                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(filterPosition + 1));
+                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(filterPosition + 1, -1));
 
             } else {
                 var transformMethodName = '_transform_' + id + '_' + planNum;
@@ -409,7 +475,7 @@
                 def.run = last.name;
             }
 
-            console.log(id, plan, def);
+            //console.log(id, plan, def);
             return def;
 
         }
@@ -1123,14 +1189,14 @@
         };
 
         const compMap = {
-            "<": "lt-filter",
-            ">": "gt-filter",
-            "<=": "lte-filter",
-            ">=": "gte-filter",
-            "===": "eq-filter",
-            "!==": "neq-filter",
-            "~true": "truthy-filter",
-            "~false": "falsey-filter",
+            "<"      : "lt-filter",
+            ">"      : "gt-filter",
+            "<="     : "lte-filter",
+            ">="     : "gte-filter",
+            "==="    : "eq-filter",
+            "!=="    : "neq-filter",
+            "~true"  : "truthy-filter",
+            "~false" : "falsey-filter",
         };
 
         if (bits[0] in typeMap) {
