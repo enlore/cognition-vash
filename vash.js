@@ -1091,7 +1091,10 @@
             // a number
             // (trying not to actually look at the val)
             if (/(>=|<=|>|<|===|!==)/.test(sym) && !/'.*'/.test(val)) {
-                val = parseFloat(val);
+                var work = val;
+                val = parseFloat(work);
+
+                if (isNaN(val)) throw new Error("Vash: NaN'd a string with parseFloat: \"" + work +"\". String values have to be single quoted (e.g. 'bark'), numbers have to be unquoted (e.g. 5).");
 
             } else if (/'.*'/.test(val)) {
                 val = val.replace(/'/g, "");
