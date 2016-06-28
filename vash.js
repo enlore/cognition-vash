@@ -246,15 +246,15 @@
 
         }
 
+        /**
+        * Recieves a subset of the plan objects
+        */
         function doTemplateTransformMethod(id, plan, msg){
-
-            if (plan.length <= 2) return msg;
 
             var cur = msg;
             var mi = this.mapItem;
 
-            // skip the first and last
-            for (var i = 1; i < plan.length - 1; i++) {
+            for (var i = 0; i < plan.length; i++) {
                 var tok = plan[i];
 
                 if (tok.type === "prop") {
@@ -304,6 +304,46 @@
 
         }
 
+        function createTransforms (id, plan, planNum, def) {
+
+            var hasFilter = false;
+            var filterPosition = null;
+
+            for (var i = 1; i < plan.length - 1; i++) {
+                if (hasFilter && plan[i].filter) {
+                    var err = new Error("You can only bind one filter per directive. Found an extra: " + plan[i].name);
+                    throw err;
+
+                } else if (plan[i].filter) {
+                    hasFilter = true;
+                    filterPosition = i;
+                }
+            }
+
+            if (hasFilter) {
+                var conformMethodName = '_conform_' + id + '_' +  planNum;
+                activeScriptData[conformMethodName] = createTemplateTransformMethod(id, plan.slice(1, filterPosition));
+
+                def.adapt = conformMethodName;
+                def.adaptPresent = true;
+                def.adaptType = PROP;
+
+                def.filter = plan[filterPosition].name;
+
+                var transformMethodName = '_transform_' + id + '_' + planNum;
+                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(filterPosition + 1));
+
+            } else {
+                var transformMethodName = '_transform_' + id + '_' + planNum;
+                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(1, -1));
+            }
+
+            def.transform = transformMethodName;
+            def.transformPresent = true;
+            def.transformType = PROP;
+
+            return def;
+        }
 
         function createSensorDefFromPlan(id, plan, planNum) {
 
@@ -354,13 +394,7 @@
                 throw err;
             }
 
-            // emit, emitPresent, emitType
-
-            var transformMethodName = '_transform_' + id + '_' + planNum;
-            activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan);
-            def.transform = transformMethodName;
-            def.transformPresent = true;
-            def.transformType = PROP;
+            def = createTransforms(id, plan, planNum, def);
 
             if (last.type === "data") {
                 def.pipe = last.name;
