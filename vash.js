@@ -1,5 +1,5 @@
 /* jshint node: false, esversion: 6 */
-// version 1.7.0 -- added relay tag
+// version 1.8.2 -- added relay tag and filters
 
 ;(function VASH(context) {
     "use strict";
