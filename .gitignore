@@ -1,2 +1,5 @@
 .release.json
 .stage
+node_modules
+bower_components
+.idea

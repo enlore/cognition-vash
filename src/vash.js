@@ -246,15 +246,15 @@
 
         }
 
-        /**
-        * Recieves a subset of the plan objects
-        */
         function doTemplateTransformMethod(id, plan, msg){
+
+            if (plan.length <= 2) return msg;
 
             var cur = msg;
             var mi = this.mapItem;
 
-            for (var i = 0; i < plan.length; i++) {
+            // skip the first and last
+            for (var i = 1; i < plan.length - 1; i++) {
                 var tok = plan[i];
 
                 if (tok.type === "prop") {
@@ -304,112 +304,6 @@
 
         }
 
-        function createTransforms (id, plan, planNum, def) {
-
-            var filterFunMap = {
-                "lt-filter": function (val) {
-                    return function (msg) {
-                        return msg < val;
-                    }
-                },
-
-                "gt-filter": function (val) {
-                    return function (msg) {
-                        return msg > val;
-                    }
-                },
-
-                "lte-filter": function (val) {
-                    return function (msg) {
-                        return msg <= val;
-                    }
-                },
-
-                "gte-filter": function (val) {
-                    return function (msg) {
-                        return msg >= val;
-                    }
-                },
-
-                "eq-filter": function (val) {
-                    return function (msg) {
-                        return msg === val;
-                    }
-                },
-
-                "neq-filter": function (val) {
-                    return function (msg) {
-                        return msg !== val;
-                    }
-                },
-
-                // 0 > false
-                // "" > false
-                // "cat" > true
-                "truthy-filter": function () {
-                    return function (msg) {
-                        return !!msg;
-                    }
-                },
-
-                // 0 > true
-                // "" > true
-                // "cat" > false
-                "falsey-filter": function () {
-                    return function (msg) {
-                        return !!!msg;
-                    }
-                }
-            };
-
-            var hasFilter = false;
-            var filterPosition = null;
-
-            for (var i = 1; i < plan.length - 1; i++) {
-                if (hasFilter && plan[i].filter) {
-                    var err = new Error("You can only bind one filter per directive. Found an extra: " + plan[i].name);
-                    throw err;
-
-                } else if (plan[i].filter) {
-                    hasFilter = true;
-                    filterPosition = i;
-                }
-            }
-
-            if (hasFilter) {
-                var conformMethodName = '_conform_' + id + '_' +  planNum;
-                activeScriptData[conformMethodName] = createTemplateTransformMethod(id, plan.slice(1, filterPosition));
-
-                def.adapt = conformMethodName;
-                def.adaptPresent = true;
-                def.adaptType = PROP;
-
-                if (plan[filterPosition].type === "method") {
-                    def.filter = plan[filterPosition].name;
-
-                } else {
-                    var filter = plan[filterPosition];
-                    var filterMethodName =  "_" + filter.type + "_" + (filter.value || "") + "_" + id + "_" + planNum;
-
-                    activeScriptData[filterMethodName] = filterFunMap[filter.type](filter.value/*, msg comes in here */);
-
-                    def.filter = filterMethodName;
-                }
-
-                var transformMethodName = '_transform_' + id + '_' + planNum;
-                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(filterPosition + 1, -1));
-
-            } else {
-                var transformMethodName = '_transform_' + id + '_' + planNum;
-                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(1, -1));
-            }
-
-            def.transform = transformMethodName;
-            def.transformPresent = true;
-            def.transformType = PROP;
-
-            return def;
-        }
 
         function createSensorDefFromPlan(id, plan, planNum) {
 
@@ -460,7 +354,13 @@
                 throw err;
             }
 
-            def = createTransforms(id, plan, planNum, def);
+            // emit, emitPresent, emitType
+
+            var transformMethodName = '_transform_' + id + '_' + planNum;
+            activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan);
+            def.transform = transformMethodName;
+            def.transformPresent = true;
+            def.transformType = PROP;
 
             if (last.type === "data") {
                 def.pipe = last.name;
@@ -475,7 +375,7 @@
                 def.run = last.name;
             }
 
-            //console.log(id, plan, def);
+            console.log(id, plan, def);
             return def;
 
         }
@@ -1147,44 +1047,15 @@
             // ?    optional object prop or data loc
             // !    needed data loc
             // .    chain/deref operator
-            // :    topic separator
-            // >
-            // <
-            // >=
-            // <=
-            // ===
-            // !==
-            // ~false
-            // ~true
+            // :    topic operator
 
-        const syms = ["@", "#", "*", ">", "<", ">=", "<=", "===", "!==", "~false", "~true"];
+        const first = link.charAt(0);
+        const syms = ["@", "#", "*"];
 
-        //var re = buildRegex(syms);
-        var re = /^(@|#|\*|>=|<=|>|<|===|!==|~false|~true)/
+        if (syms.indexOf(first) !== -1)
+            return [first, link.slice(1)];
 
-        var res;
-
-        if ((res = re.exec(link))) {
-            var sym = res[0];
-            var len = sym.length;
-            var val = link.slice(len).trim();
-
-            // if we don't see single quotes wrapping a the val, assume
-            // a number
-            // (trying not to actually look at the val)
-            if (/(>=|<=|>|<|===|!==)/.test(sym) && !/'.*'/.test(val)) {
-                var work = val;
-                val = parseFloat(work);
-
-                if (isNaN(val)) throw new Error("Vash: NaN'd a string with parseFloat: \"" + work +"\". String values have to be single quoted (e.g. 'bark'), numbers have to be unquoted (e.g. 5).");
-
-            } else if (/'.*'/.test(val)) {
-                val = val.replace(/'/g, "");
-            }
-
-            return [sym, val];
-
-        } else {
+        else {
            let bits = link.split(".");
            return bits;
         }
@@ -1204,17 +1075,6 @@
             "*": "method"
         };
 
-        const compMap = {
-            "<"      : "lt-filter",
-            ">"      : "gt-filter",
-            "<="     : "lte-filter",
-            ">="     : "gte-filter",
-            "==="    : "eq-filter",
-            "!=="    : "neq-filter",
-            "~true"  : "truthy-filter",
-            "~false" : "falsey-filter",
-        };
-
         if (bits[0] in typeMap) {
             let plan = {
                 type: typeMap[bits[0]]
@@ -1223,18 +1083,8 @@
             if (/\?$/.test(bits[1]) && plan.type === "method") {
                 plan.filter = true;
                 plan.name = bits[1].slice(0, -1);
-
             } else {
                 plan.name = bits[1];
-            }
-
-            return plan;
-
-        } else if (bits[0] in compMap) {
-            let plan = {
-                type: compMap[bits[0]],
-                filter: true,
-                value: bits[1] || null
             }
 
             return plan;
