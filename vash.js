@@ -1,5 +1,5 @@
 /* jshint node: false, esversion: 6 */
-// version 1.6.0 -- templates only on prototype
+// version 1.7.0 -- added relay tag
 
 ;(function VASH(context) {
     "use strict";
@@ -467,6 +467,7 @@
 
         decs.aliases = [].concat(getDefs2(sel.alias, extractAliasDef2));
         decs.adapters = [].concat(getDefs2(sel.adapter, extractAdapterDef2));
+        decs.relays = [].concat(getDefs2(sel.relay, extractRelayDef));
         decs.valves = [].concat(getDefs2(sel.valve, extractValveDef2));
         decs.dataSources = [].concat(getDefs2(sel.data, extractDataDef2));
         decs.dataSources = decs.dataSources.concat(getDefs2(sel.net, extractNetDef2));
@@ -584,6 +585,9 @@
             filter: extractString2(node, 'filter'),
             topic: extractString2(node, 'for,on,topic', 'update'),
             run: extractString2(node, 'run'),
+            tag: extractString2(node, 'tag'),
+            tagPresent: extractHasAttr2(node, 'tag'),
+            tagType: null,
             emit: extractString2(node, 'emit'),
             emitPresent: extractHasAttr2(node, 'emit'),
             emitType: null,
@@ -641,6 +645,7 @@
 
         applyFieldType(d, 'transform', PROP);
         applyFieldType(d, 'emit', STRING);
+        applyFieldType(d, 'tag', STRING);
         applyFieldType(d, 'adapt', PROP);
 
         return d;
@@ -689,6 +694,17 @@
 
         applyFieldType(d, 'field', STRING);
 
+
+        return d;
+    }
+
+    function extractRelayDef(node){
+
+        var d =  {
+            in: extractString2(node, 'in'),
+            out: extractString2(node, 'out'),
+            optional: extractBool2(node, 'optional'),
+        };
 
         return d;
     }
