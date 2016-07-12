@@ -366,11 +366,11 @@
             var filterPosition = null;
 
             for (var i = 1; i < plan.length - 1; i++) {
-                if (hasFilter && plan[i].filter) {
+                if (hasFilter && plan[i].isFilter) {
                     var err = new Error("You can only bind one filter per directive. Found an extra: " + plan[i].name);
                     throw err;
 
-                } else if (plan[i].filter) {
+                } else if (plan[i].isFilter) {
                     hasFilter = true;
                     filterPosition = i;
                 }
@@ -1221,7 +1221,7 @@
             };
 
             if (/\?$/.test(bits[1]) && plan.type === "method") {
-                plan.filter = true;
+                plan.isFilter = true;
                 plan.name = bits[1].slice(0, -1);
 
             } else {
@@ -1233,7 +1233,7 @@
         } else if (bits[0] in compMap) {
             let plan = {
                 type: compMap[bits[0]],
-                filter: true,
+                isFilter: true,
                 value: bits[1] || null
             }
 
